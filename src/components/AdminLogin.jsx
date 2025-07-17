@@ -1,47 +1,63 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabaseClient';
 
-const AdminLogin = ({ onLogin, adminCredentials }) => {
+const AdminLogin = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({
-    username: '',
+    email: '',
     password: ''
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (credentials.username === adminCredentials.username && credentials.password === adminCredentials.password) {
+    const { error } = await supabase.auth.signInWithPassword(credentials);
+
+    if (error) {
+      toast({
+        title: "Error de acceso",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
       onLogin();
       toast({
         title: "¡Acceso concedido!",
         description: "Bienvenido al panel de administración",
       });
-    } else {
-      toast({
-        title: "Error de acceso",
-        description: "Usuario o contraseña incorrectos",
-        variant: "destructive"
-      });
     }
   };
 
-  const handleForgotPassword = () => {
-    const email = "roston212@gmail.com";
-    const subject = "Recuperación de Contraseña - Rifas Animalitos";
-    const body = "Hola,\n\nHas solicitado recuperar tu contraseña. Por favor, haz clic en el siguiente enlace para restablecerla:\n\n[Enlace de reseteo aquí]\n\nSi no solicitaste esto, puedes ignorar este correo.\n\nSaludos,\nEl equipo de Rifas Animalitos";
-    
-    const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    window.location.href = mailtoLink;
+  const handleForgotPassword = async () => {
+    const { email } = credentials;
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Por favor, introduce tu correo electrónico para recuperar la contraseña.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    toast({
-      title: "Correo de recuperación enviado",
-      description: `Se ha abierto tu cliente de correo para enviar un enlace de recuperación a ${email}. Como no puedo enviar correos reales, este es un paso simulado.`,
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
     });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Correo de recuperación enviado",
+        description: `Se ha enviado un enlace de recuperación a ${email}.`,
+      });
+    }
   };
 
   return (
@@ -70,10 +86,10 @@ const AdminLogin = ({ onLogin, adminCredentials }) => {
             <div className="relative">
               <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 w-5 h-5" />
               <input
-                type="text"
-                placeholder="Usuario"
-                value={credentials.username}
-                onChange={(e) => setCredentials({...credentials, username: e.target.value})}
+                type="email"
+                placeholder="Email"
+                value={credentials.email}
+                onChange={(e) => setCredentials({...credentials, email: e.target.value})}
                 className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all"
                 required
               />

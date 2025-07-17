@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
@@ -7,39 +6,37 @@ import AdminDashboard from '@/components/AdminDashboard';
 import UserInterface from '@/components/UserInterface';
 import { Toaster } from '@/components/ui/toaster';
 import ShareButton from '@/components/ShareButton';
+import { supabase } from '@/lib/supabaseClient';
 
 function App() {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [session, setSession] = useState(null);
   const [purchases, setPurchases] = useState(() => {
     const savedPurchases = localStorage.getItem('purchases');
     return savedPurchases ? JSON.parse(savedPurchases) : [];
   });
-  const [adminCredentials, setAdminCredentials] = useState(() => {
-    const savedCreds = localStorage.getItem('adminCredentials');
-    return savedCreds ? JSON.parse(savedCreds) : { username: 'admin', password: 'admin123' };
-  });
 
   useEffect(() => {
-    const adminSession = localStorage.getItem('adminSession');
-    if (adminSession) {
-      setIsLoggedIn(true);
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
   }, []);
 
-  const handleAdminLogin = () => {
-    setIsLoggedIn(true);
-    localStorage.setItem('adminSession', 'true');
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('adminSession');
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   const toggleAdminMode = () => {
     setIsAdmin(!isAdmin);
-    if (isAdmin && isLoggedIn) {
+    if (isAdmin && session) {
       handleLogout();
     }
   };
@@ -47,11 +44,6 @@ function App() {
   const updatePurchases = (newPurchases) => {
     setPurchases(newPurchases);
     localStorage.setItem('purchases', JSON.stringify(newPurchases));
-  };
-
-  const updateAdminCredentials = (newCredentials) => {
-    setAdminCredentials(newCredentials);
-    localStorage.setItem('adminCredentials', JSON.stringify(newCredentials));
   };
 
   return (
@@ -74,16 +66,15 @@ function App() {
         <ShareButton />
 
         {isAdmin ? (
-          isLoggedIn ? (
+          session ? (
             <AdminDashboard 
               onLogout={handleLogout} 
               purchases={purchases} 
               updatePurchases={updatePurchases}
-              adminCredentials={adminCredentials}
-              updateAdminCredentials={updateAdminCredentials}
+              session={session}
             />
           ) : (
-            <AdminLogin onLogin={handleAdminLogin} adminCredentials={adminCredentials} />
+            <AdminLogin onLogin={() => {}} />
           )
         ) : (
           <UserInterface purchases={purchases} updatePurchases={updatePurchases} />
